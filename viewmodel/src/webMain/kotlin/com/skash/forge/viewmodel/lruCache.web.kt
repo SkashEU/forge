@@ -1,5 +1,7 @@
 package com.skash.forge.viewmodel
 
+import kotlinx.coroutines.Dispatchers
+
 internal actual fun <K, V> lruCache(maxSize: Int): MutableMap<K, V> {
     return KmpLruCache(maxSize)
 }

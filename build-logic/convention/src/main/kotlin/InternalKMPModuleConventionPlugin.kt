@@ -51,6 +51,12 @@ class InternalKMPModuleConventionPlugin : Plugin<Project> {
                     }
                 }
 
+                sourceSets.androidMain {
+                    dependencies {
+                        implementation(findLibraryByName("kotlinx-coroutines-android"))
+                    }
+                }
+
                 sourceSets.commonMain {
                     dependencies {
                         implementation(findLibraryByName("kotlin-stdlib"))
@@ -60,7 +66,7 @@ class InternalKMPModuleConventionPlugin : Plugin<Project> {
 
                 sourceSets.jvmMain {
                     dependencies {
-                        implementation(findLibraryByName("kotlinx-coroutinesSwing"))
+                        implementation(findLibraryByName("kotlinx-coroutines-swing"))
                     }
                 }
 
