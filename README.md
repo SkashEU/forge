@@ -1,51 +1,76 @@
 # Forge
 
-My personal collection of shareable & reusable modules for Kotlin & Compose Multiplatform.
+Forge is a Kotlin Multiplatform framework designed to streamline the development of applications targeting Android, iOS, Desktop, and Web. It provides a solid foundation based on clean architecture principles, promoting modularity, testability, and maintainability.
+Forge is built to match the architecture of all my projects.
 
-It's a set of pre-built libraries that I add as dependencies in new projects.
+## Modules
 
-When I start a new KMP app, I import these modules to skip the setup for common architectural components like state aware ViewModels, networking, and navigation.
+The project is structured into the following modules:
 
-## Supported Platforms
+- **:examples:composeApp**: A sample application demonstrating the framework's usage. It's a Compose Multiplatform app targeting Android, iOS, Desktop, and Web.
+- **:viewmodel**: A Kotlin Multiplatform library that contains the implementation of a state aware base ViewModel.
+- **:usecase**: This library holds the base implementation of UseCase and OutcomeUseCase for more complex use cases (Handling of Success, Failure & Progressing).
+- **:navigation**: Platform-agnostic API for navigation.
+- **:outcome**: Provides a wrapper for representing the result of an operation, typically a success or a failure.
+- **:logger**: A logging library for structured logging across all platforms, using the `kermit` library as default. Also exposes an interface to create your own logger.
+- **:event**: For handling and dispatching events throughout the application.
+- **:paging**: A library for implementing pagination, built on top of `androidx.paging.common`. It exposes a factory to create a map any kind of UseCase to a PagingSource.
+- **:network:api**: This group of modules defines the API for the networking layer.
+  - **:network:api:client**: Defines the contract for the network client.
+  - **:network:api:request**: Contains the data models for API requests.
+  - **:network:api:response**: Contains the data models for API responses.
+  - **:network:api:session**: Manages session-related data, like authentication tokens.
+- **:network:ktor**: An implementation of the `:network:api:client` using the Ktor networking library.
 
-All modules are built with Kotlin Multiplatform, targeting:
-*  **Android**
-*  **iOS**
-*  **JVM (Desktop)**
-*  **Web**
+## How to Build and Run
 
-## Available Modules
+To build and run the project, you can use the following Gradle commands from the root directory.
 
-TODO
+### Android
 
+To build and install the app on a connected Android device or emulator:
 
-## How to Use (Installation)
+```sh
+./gradlew :examples:composeApp:installDebug
+```
 
-To add Forge modules to your own KMP project from **GitHub Packages**:
+### Desktop (JVM)
 
-1.  **Add the GitHub Packages Repository**
-    Add the following to your `settings.gradle.kts`.
+To run the desktop application:
 
-    ```kotlin
-    // settings.gradle.kts
-    dependencyResolutionManagement {
-        repositories {
-            mavenCentral()
-            // Add GitHub Packages repository
-            maven {
-                url = uri("https://maven.pkg.github.com/SkashEU/forge")
-            }
-        }
-    }
-    ```
+```sh
+./gradlew :examples:composeApp:run
+```
 
-2.  **Add Module Dependencies**
-    In your `shared/build.gradle.kts` file, add the modules you need.
+### iOS
 
-    ```kotlin
-    // shared/build.gradle.kts
-    sourceSets {
-        commonMain.dependencies {
-        }
-    }
-    ```
+To build and run on an iOS simulator or device, open the project in Xcode:
+
+1.  Open `iosApp/iosApp.xcworkspace` in Xcode.
+2.  Select the `iosApp` scheme and a target device.
+3.  Click the "Run" button.
+
+### Web (JavaScript)
+
+To run the web application in a browser with hot reload:
+
+```sh
+./gradlew :examples:composeApp:jsBrowserDevelopmentRun
+```
+
+### Web (Wasm)
+
+To run the web application in a browser with hot reload:
+
+```sh
+./gradlew :examples:composeApp:wasmJsBrowserDevelopmentRun
+```
+
+## Key Dependencies
+
+The project relies on several key libraries and technologies:
+
+- **Kotlin Multiplatform**: For sharing code across different platforms.
+- **Jetpack Compose**: For building declarative user interfaces.
+- **Ktor**: For networking.
+- **Kermit**: For logging.
