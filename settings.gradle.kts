@@ -34,7 +34,6 @@ plugins {
 }
 
 include(":examples:composeApp")
-include("examples")
 include(":network")
 include(":network:api")
 include(":network:api:client")
@@ -42,3 +41,8 @@ include(":network:api:request")
 include(":network:api:session")
 include(":network:api:response")
 include(":network:ktor")
+include(":outcome")
+include(":viewmodel")
+include(":navigation")
+include(":logger")
+include(":event")
