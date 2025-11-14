@@ -5,6 +5,9 @@ import com.skash.forge.navigation.NavigationDispatcher
 import com.skash.forge.navigation.NavigationEvent
 import com.skash.forge.outcome.collectOutcome
 import com.skash.forge.viewmodel.StateViewModel
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed interface ExampleState {
@@ -26,10 +29,24 @@ class NavigationDispatcher : NavigationDispatcher {
     }
 }
 
-class ExampleViewModel : StateViewModel<ExampleState, ExampleState.Intent, String>(
+class ExampleViewModel(
+    observeCounterUseCase: ObserveCounterUseCase,
+    private val exampleUseCase: ExampleUseCase,
+) : StateViewModel<ExampleState, ExampleState.Intent, String>(
     initialState = ExampleState.Success(1),
     navigationDispatcher = NavigationDispatcher()
 ) {
+
+    private val count = observeCounterUseCase.invoke(Unit)
+        .onEach {
+            reduceState<ExampleState.Success> { copy(count = it) }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null
+        )
+
     override fun executeIntent(intent: ExampleState.Intent) = when (intent) {
         ExampleState.Success.Intent.Decrement -> reduceState<ExampleState.Success> {
             copy(count = count - 1)
@@ -44,14 +61,13 @@ class ExampleViewModel : StateViewModel<ExampleState, ExampleState.Intent, Strin
     ) {
 
         viewModelScope.launch {
-            ExampleUseCase()
+            exampleUseCase
                 .invoke(ExampleUseCase.ExampleUseCaseParams(state.count))
                 .collectOutcome(
                     onSuccess = { updatedCount ->
-                        setState(state.copy(count = updatedCount))
                     },
                     onProgress = {
-                        setState(ExampleState.Loading)
+                     //   setState(ExampleState.Loading)
                     }
                 )
         }

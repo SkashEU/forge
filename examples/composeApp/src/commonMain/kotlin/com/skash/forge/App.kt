@@ -10,27 +10,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.koin.compose.KoinApplication
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 @Preview
-fun App(viewModel: ExampleViewModel = viewModel()) {
-    MaterialTheme {
-        val state by viewModel.collectStateFlow().collectAsState()
+fun App() {
 
-        Surface {
-            when (val uiState = state) {
-                is ExampleState.Error -> {}
-                ExampleState.Loading -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        LinearProgressIndicator()
+    KoinApplication(application = {
+        modules(appContainer)
+    }) {
+        MaterialTheme {
+            val viewModel: ExampleViewModel = koinViewModel()
+            val state by viewModel.collectStateFlow().collectAsState()
+
+            Surface {
+                when (val uiState = state) {
+                    is ExampleState.Error -> {}
+                    ExampleState.Loading -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            LinearProgressIndicator()
+                        }
                     }
-                }
 
-                is ExampleState.Success -> CounterPage(
-                    count = uiState.count,
-                    onIncrement = { viewModel.executeIntent(ExampleState.Success.Intent.Increment) },
-                    onDecrement = { viewModel.executeIntent(ExampleState.Success.Intent.Decrement) }
-                )
+                    is ExampleState.Success -> CounterPage(
+                        count = uiState.count,
+                        onIncrement = { viewModel.executeIntent(ExampleState.Success.Intent.Increment) },
+                        onDecrement = { viewModel.executeIntent(ExampleState.Success.Intent.Decrement) }
+                    )
+                }
             }
         }
     }

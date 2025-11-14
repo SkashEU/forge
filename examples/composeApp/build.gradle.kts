@@ -44,6 +44,8 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation("androidx.datastore:datastore-preferences:1.1.7")
+
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -58,6 +60,11 @@ kotlin {
             implementation(projects.viewmodel)
             implementation(projects.usecase)
 
+            implementation(projects.datastore.multiplatformSettings)
+
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
