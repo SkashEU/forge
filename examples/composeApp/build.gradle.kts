@@ -54,6 +54,10 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+
+            implementation(projects.viewmodel)
+            implementation(projects.usecase)
+
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
