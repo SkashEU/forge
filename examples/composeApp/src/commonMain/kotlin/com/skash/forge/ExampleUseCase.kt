@@ -13,7 +13,6 @@ class ExampleUseCase(
     override suspend fun FlowCollector<Outcome<Unit, String>>.execute(
         params: ExampleUseCaseParams
     ) {
-        delay(1000)
         dataStore.set(AppDataEntry.Count, params.count + 1)
         emitSuccess(Unit)
     }

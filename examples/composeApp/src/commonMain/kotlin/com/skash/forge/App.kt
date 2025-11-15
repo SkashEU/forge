@@ -21,7 +21,7 @@ fun App() {
         modules(appContainer)
     }) {
         MaterialTheme {
-            val viewModel: ExampleViewModel = koinViewModel()
+            val viewModel = koinViewModel<ExampleViewModel>()
             val state by viewModel.collectStateFlow().collectAsState()
 
             Surface {

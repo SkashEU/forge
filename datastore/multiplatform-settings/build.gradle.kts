@@ -11,9 +11,27 @@ kotlin {
         commonMain.dependencies {
             api(projects.datastore.api)
 
-            api("com.russhwolf:multiplatform-settings-coroutines:1.3.0")
-            api("com.russhwolf:multiplatform-settings:1.3.0")
-            api("com.russhwolf:multiplatform-settings-make-observable:1.3.0")
+            api(libs.multiplatform.settings.coroutines)
+            api(libs.multiplatform.settings)
+        }
+
+        androidMain.dependencies {
+            implementation(libs.androidx.datastore.datastore.preferences)
+            implementation(libs.androidx.startup.runtime)
+            implementation(libs.russhwolf.multiplatform.settings.datastore)
+        }
+
+        iosMain.dependencies {
+            implementation(libs.russhwolf.multiplatform.settings.datastore)
+        }
+
+        jvmMain.dependencies {
+            implementation(libs.russhwolf.multiplatform.settings.datastore)
+            implementation(libs.androidx.datastore.datastore.preferences)
+        }
+
+        webMain.dependencies {
+            implementation(libs.multiplatform.settings.make.observable)
         }
     }
 }

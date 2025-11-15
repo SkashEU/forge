@@ -37,7 +37,7 @@ class ExampleViewModel(
     navigationDispatcher = NavigationDispatcher()
 ) {
 
-    private val count = observeCounterUseCase.invoke(Unit)
+    private val count = observeCounterUseCase(Unit)
         .onEach {
             reduceState<ExampleState.Success> { copy(count = it) }
         }
@@ -61,8 +61,7 @@ class ExampleViewModel(
     ) {
 
         viewModelScope.launch {
-            exampleUseCase
-                .invoke(ExampleUseCase.ExampleUseCaseParams(state.count))
+            exampleUseCase(ExampleUseCase.ExampleUseCaseParams(state.count))
                 .collectOutcome(
                     onSuccess = { updatedCount ->
                     },
