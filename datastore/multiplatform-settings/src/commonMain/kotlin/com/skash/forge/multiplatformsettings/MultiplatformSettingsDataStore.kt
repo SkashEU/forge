@@ -28,7 +28,7 @@ class MultiplatformSettingsDataStore(
             return settings.getStringFlow(
                 key = key,
                 defaultValue = defaultJsonString
-            ).map { json.decodeFromString(serializer, defaultJsonString) }
+            ).map { json.decodeFromString(serializer, it) }
         }
 
         return when (dataEntry.primitiveType) {
