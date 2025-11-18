@@ -162,6 +162,21 @@ abstract class StateViewModel<State : Any, Intent, Event : Any>(
     }
 
     /**
+     * Type-safe state reducer. Applies transformations to the current state when its of expected type or creates a new one.
+     * @param S The exact state type expected for this reduction.
+     * @param reducer Transformation function that produces a new state.
+     * @param create Creates a new state of type [S] if current state doesn't match type [S].
+     *
+     */
+    protected inline fun <reified S : State> reduceStateOrCreate(
+        crossinline reducer: S.() -> State,
+        crossinline create: () -> S,
+    ) {
+        val newState = (currentState as? S)?.reducer() ?: create()
+        setState(newState)
+    }
+
+    /**
      * Type-safe intent handler. Only processes the intent if current state of the viewmodel is the expected one.
      * @param S The required state the ViewModel needs to be in for the intent to get handled.
      * @param I The type of intent to handle
