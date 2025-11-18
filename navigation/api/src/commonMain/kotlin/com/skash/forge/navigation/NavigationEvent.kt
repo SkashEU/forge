@@ -1,8 +1,8 @@
 package com.skash.forge.navigation
 
 sealed interface NavigationEvent {
-    data class NavigateTo(
-        val destination: NavDestination,
+    data class NavigateTo<T: Any>(
+        val destination: T,
         val options: NavOptions? = null,
     ) : NavigationEvent
 
