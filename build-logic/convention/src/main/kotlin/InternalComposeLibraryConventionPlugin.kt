@@ -24,6 +24,7 @@ class InternalComposeLibraryConventionPlugin : Plugin<Project> {
                         api(composeExtension.dependencies.materialIconsExtended)
                         implementation(composeExtension.dependencies.animation)
                         implementation(composeExtension.dependencies.animationGraphics)
+                        implementation(findLibraryByName("androidx-lifecycle-runtimeCompose"))
 
                         implementation(composeExtension.dependencies.components.resources)
                         implementation(composeExtension.dependencies.components.uiToolingPreview)

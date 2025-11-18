@@ -32,8 +32,9 @@ val Project.JVM_TOOLCHAIN_VERSION
             .findIntVersion("jvm-toolchain")
             ?: FALLBACK_JVM_VERSION
 
-val Project.composeExtension
-    get() = project.extensions.create("composeInternal", ComposeExtension::class.java, project)
+val Project.composeExtension: ComposeExtension
+    get() = extensions.findByType(ComposeExtension::class.java)
+        ?: extensions.create("composeInternal", ComposeExtension::class.java, this)
 
 val Project.xcFrameworkName
     get() = project.name.split("-").joinToString("") {
