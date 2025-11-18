@@ -11,7 +11,7 @@ kotlin {
         commonMain.dependencies {
             api(libs.androidx.lifecycle.viewmodelCompose)
             api(projects.outcome)
-            api(projects.navigation)
+            api(projects.navigation.api)
             api(projects.logger)
             api(projects.event)
         }
