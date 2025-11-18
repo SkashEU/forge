@@ -1,8 +1,9 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
-package com.skash.forge.multiplatformsettings
+package com.skash.forge.datastore.multiplatformsettings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.russhwolf.settings.ExperimentalSettingsApi
 import com.russhwolf.settings.coroutines.FlowSettings
 import com.russhwolf.settings.datastore.DataStoreSettings
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -12,7 +13,7 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
 
-@OptIn(markerClass = [com.russhwolf.settings.ExperimentalSettingsApi::class])
+@OptIn(markerClass = [ExperimentalSettingsApi::class])
 internal actual fun createFlowSettings(): FlowSettings {
     val dataStore = PreferenceDataStoreFactory.createWithPath {
         val documentDirectory: NSURL? = NSFileManager.defaultManager.URLForDirectory(
@@ -22,7 +23,7 @@ internal actual fun createFlowSettings(): FlowSettings {
             create = false,
             error = null,
         )
-        val pathString = requireNotNull(documentDirectory).path + "/$PREF_NAME"
+        val pathString = requireNotNull(documentDirectory).path + "/${PREF_NAME}"
         pathString.toPath()
     }
     return DataStoreSettings(dataStore)

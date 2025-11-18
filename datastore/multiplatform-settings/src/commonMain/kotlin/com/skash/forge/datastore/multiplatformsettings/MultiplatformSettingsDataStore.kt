@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalSettingsApi::class)
 
-package com.skash.forge.multiplatformsettings
+package com.skash.forge.datastore.multiplatformsettings
 
 import com.russhwolf.settings.ExperimentalSettingsApi
 import com.russhwolf.settings.coroutines.FlowSettings

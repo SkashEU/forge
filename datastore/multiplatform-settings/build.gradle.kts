@@ -4,7 +4,7 @@ plugins {
 
 kotlin {
     androidLibrary {
-        namespace = "com.skash.forge.multiplatformsettings"
+        namespace = "com.skash.forge.datastore.multiplatformsettings"
     }
 
     sourceSets {

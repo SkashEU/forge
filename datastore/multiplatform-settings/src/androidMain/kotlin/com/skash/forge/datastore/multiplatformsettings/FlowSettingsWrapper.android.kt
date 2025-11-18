@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalSettingsImplementation::class)
 
-package com.skash.forge.multiplatformsettings
+package com.skash.forge.datastore.multiplatformsettings
 
 import android.content.Context
 import androidx.datastore.core.DataStore

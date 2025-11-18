@@ -10,7 +10,7 @@
                 tools:node="merge">
 
             <meta-data
-                    android:name="com.skash.forge.multiplatformsettings.DataStoreInitializer"
+                    android:name="com.skash.forge.datastore.multiplatformsettings.DataStoreInitializer"
                     android:value="androidx.startup"/>
         </provider>
 
