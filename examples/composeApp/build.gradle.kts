@@ -8,12 +8,13 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
     androidTarget {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+            jvmTarget.set(JvmTarget.JVM_21)
         }
     }
 
@@ -44,13 +45,13 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
-            implementation("androidx.datastore:datastore-preferences:1.1.7")
-
         }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
+
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
@@ -60,7 +61,10 @@ kotlin {
             implementation(projects.viewmodel)
             implementation(projects.usecase)
 
+            implementation(projects.navigation.nav2)
             implementation(projects.datastore.multiplatformSettings)
+
+            implementation(projects.network.ktor)
 
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.compose)

@@ -1,5 +1,6 @@
-package com.skash.forge
+package com.skash.forge.domain.usecase
 
+import com.skash.forge.AppDataEntry
 import com.skash.forge.datastore.DataStore
 import com.skash.forge.usecase.UseCase
 import kotlinx.coroutines.flow.Flow
