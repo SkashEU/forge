@@ -484,6 +484,90 @@ composable<AppScreen.Main> { backStackEntry ->
 }
 ```
 
+### DataStore & Type-Safe Persistence
+
+Forge provides a strongly typed, platform-agnostic API for key-value storage. Instead of using "magic strings" and casting generic objects, you define **`DataEntry`** objects that carry both the key name and the expected data type.
+
+**Key Features:**
+* **Type Safety:** Keys define their own type (`Int`, `String`, `Boolean`, or Custom Objects).
+* **Reactive:** Built-in support for observing values as a `Flow`.
+* **Serialization:** Native support for storing complex objects using `kotlinx.serialization`.
+* **Default Values:** Every key requires a default value, eliminating null checks in your business logic.
+
+#### 1. Defining Keys (The Schema)
+Define your storage schema in a global object. Use the `DataEntry` factory methods to create typed keys.
+
+```kotlin
+@Serializable
+data class UserSession(val token: String, val expiry: Long)
+
+object AppDataEntry {
+    // 1. Primitive Types
+    val Count = DataEntry.int(
+        key = "app_count",
+        defaultValue = 0
+    )
+
+    val IsOnboarded = DataEntry.boolean(
+        key = "is_onboarded",
+        defaultValue = false
+    )
+
+    // 2. Complex Objects (requires kotlinx.serialization)
+    val Session = DataEntry.serializable(
+        key = "user_session",
+        defaultValue = UserSession("", 0L),
+        serializer = UserSession.serializer(),
+    )
+}
+```
+
+##### 2. Writing Data (UseCase)
+
+Inject the `DataStore` interface into your UseCases. Because `AppDataEntry.Count` is defined as a `DataEntry<Int>`, the set method enforces that you pass an Int.
+
+```kotlin
+class DecreaseCounterUseCase(
+    private val dataStore: DataStore
+): OutcomeUseCase<Int, Unit, String>() {
+
+    override suspend fun FlowCollector<Outcome<Unit, String>>.execute(params: Int) {
+        emitSuccess(dataStore.set(AppDataEntry.Count, params - 1))
+    }
+}
+```
+
+##### 3. Observing Data (Reactive)
+
+The `observe` function returns a `Flow<T>`. It automatically emits the defaultValue if the key hasn't been written to disk yet.
+
+```kotlin
+class ObserveCounterUseCase(
+    private val dataStore: DataStore
+) : UseCase<Unit, Int>() {
+
+    override fun execute(params: Unit): Flow<Int> {
+        // Returns Flow<Int>. Emits 0 immediately if nothing is stored.
+        return dataStore.observe(AppDataEntry.Count)
+    }
+}
+```
+
+##### 4. Creating a DataStore
+
+Forge comes with the `datastore:multiplatform-settings` module that implementes the `:datastore:api`. 
+Forge uses the androidx DataStore backend for Android, JVM & iOS. On web its a wrapper around LocalStorage.
+You should only create a `DataStore` as singleton and inject it into all the classes that need it. 
+Creating multible instances will break the observing for the web targets.
+
+You can create it like this when using the `multiplatform-settings`
+
+This class accepts a custom kotlinx Json when you want to define your own rules.
+
+```kotlin
+MultiplatformSettingsDataStore()
+```
+
 ## 5. Dependency Guidelines
 
 To maintain architectural integrity, follow these strict dependency rules:
