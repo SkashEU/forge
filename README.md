@@ -16,6 +16,11 @@ It is built around Clean Architecture and focuses on:
 2. [Project Structure & Modules](#2-project-structure--modules)
 3. [Architectural Blueprint](#3-architectural-blueprint)
 4. [Feature Examples](#4-feature-examples)
+   - [UseCases & Outcome](#usecases--outcome)
+   - [StateViewModel & UDF](#stateviewmodel--udf)
+   - [Navigation & Typed Results](#navigation--typed-results)
+   - [DataStore & Type-Safe Persistence](#datastore--type-safe-persistence)
+   - [Network & HttpClient](#network--httpclient)
 5. [Dependency Guidelines](#5-dependency-guidelines)
 
 ### 1. Clean Architecture
@@ -77,7 +82,7 @@ Forge encourages a specific layering strategy to maximize code sharing and testa
 
 ## 4. Feature Examples
 
-### Outcome & Use Cases
+### UseCases & Outcome
 Encapsulate business logic in a `UseCase` that returns an `Outcome`. This forces you to handle success and failure scenarios explicitly.
 
 The `OutcomeUseCase` requires three generic arguments to enforce type safety across your Clean Architecture layers.
@@ -123,7 +128,7 @@ class UpdateProfileUseCase : OutcomeUseCase<ProfileParams, UserProfile, ProfileE
 ```
 
 
-2. Handling Exceptions safely (`emitCatching`)
+#### 2. Handling Exceptions safely (`emitCatching`)
 
 Avoid try-catch blocks by using `emitCatching`. It executes the block, captures exceptions, and maps them to your specific domain error type.
 
@@ -142,7 +147,7 @@ class ReadFileUseCase(
 }
 ```
 
-3. Integrating Network Responses (`emitFrom`)
+#### 3. Integrating Network Responses (`emitFrom`)
    
 When working with the Forge Network module, `emitFrom` automatically unpacks an `ApiResponse`, handling the Success/Error branching for you.
 
@@ -166,7 +171,7 @@ class FetchUserUseCase(
 }
 ```
 
-4. Consuming the Use Case
+#### 4. Consuming the Use Case
 
 Since `OutcomeUseCase` returns a `Flow`, it integrates naturally with `ViewModels`and especialy when using Forges `StateViewModel`.
 
@@ -191,8 +196,6 @@ fun increaseCount(currentCount: Int) {
 
 with the `StateViewModel`you can a few helper functions to consume UseCases
 
-1. consuming long running flows of data (like observing a specific datastore key or local db changes)
-
 ```kotlin
 private val posts = getDummyPostsUseCase(Unit)
         .onEachOutcome(
@@ -212,7 +215,7 @@ private val posts = getDummyPostsUseCase(Unit)
         )
 ```
 
-2. Directly consuming a UseCase
+Directly consuming a UseCase
 
 ```kotlin
 viewModelScope.launch {
@@ -302,7 +305,7 @@ sealed interface DetailState {
 }
 ```
 
-2. Implement the ViewModel
+#### 1. Implement the ViewModel
 
 This example demonstrates observing a use case, handling intent-state matching, and managing navigation results.
 
@@ -386,7 +389,7 @@ class DetailViewModel(
 }
 ```
 
-### Navigation & Results
+### Navigation & Typed Results
 Forge decouples navigation logic from the UI. ViewModels simply "request" navigation via events, and the UI layer (Compose, SwiftUI, Fragment) observes and executes them.
 
 Crucially, Forge provides a standardized way to pass data **back** from a screen (like `startActivityForResult` or `setFragmentResult`), which works seamlessly across platforms.
@@ -458,8 +461,6 @@ Finally, you need to bridge the platform's navigation system with your ViewModel
 
 This block listens to the savedStateHandle of the current backStackEntry and maps raw results into your typed MainNavigationResult events.
 This allows you to have a app wide list of events (NavigationResult) that does not depend on any feature because you dont want to build relations between feature.
-
-
 
 ```kotlin
 composable<AppScreen.Main> { backStackEntry ->
@@ -567,6 +568,200 @@ This class accepts a custom kotlinx Json when you want to define your own rules.
 ```kotlin
 MultiplatformSettingsDataStore()
 ```
+
+### Network & HttpClient
+
+Forge provides a purely abstract HTTP client. This allows your **Domain** and **Data** layers to define network interactions without depending on a specific implementation like Ktor or OkHttp.
+
+The Network API is granular, split into multiple modules so you can include only what you need:
+
+* **`client`**: The core `HttpClient` interface and request builder.
+* **`request`**: Data classes for header, http method, route, ApiRequest. This gets used by the client.
+* **`response`**: The `ApiResponse` sealed classes and functional operators.
+* **`session`**: Interfaces for token management and session expiration.
+
+#### 1. Basic Usage (Repository)
+The `HttpClient` is designed to handle the request execution and the response mapping in a single atomic operation. This keeps your Repositories clean and purely functional.
+
+```kotlin
+class DummyRepositoryImpl(
+    private val httpClient: HttpClient
+) : DummyRepository {
+
+    override suspend fun fetchDummyPosts(): ApiResponse<List<DummyPost>> =
+        httpClient.execute<DummyPostResponse, List<DummyPost>>(
+            requestBuilder = {
+                // The builder supports all standard verbs: get, post, put, patch, delete
+                get("[https://dummyjson.com/posts](https://dummyjson.com/posts)")
+            },
+            mapper = { response -> 
+                response.posts.map { it.toDummyPost() } 
+            }
+        )
+}
+```
+
+#### 2. Building Requests & Routes
+The ApiRequestBuilder provides a fluent DSL for constructing requests. All HTTP verbs (get, post, put, delete, patch) provide overloads to accept either a raw string URL or a type-safe Route object.
+
+Using Route objects (usually sealed classes) is recommended for complex APIs to ensure type safety and centralized path management.
+
+```kotlin
+httpClient.execute<UserDto, User>(
+    requestBuilder = {
+        // Option A: Raw String
+        // post("https://api.example.com/users")
+        
+        // Option B: Type-Safe Route (Recommended)
+        post(UserRoutes.Create)
+        
+        // Type-safe body serialization
+        body(CreateUserRequest(name = "John"))
+        
+        // Headers & Parameters
+        header("Authorization", "Bearer xyz")
+        parameters {
+            put("sort", "desc")
+        }
+    },
+    mapper = { it.toDomain() }
+)
+```
+
+#### 3. Functional Response Handling
+The `ApiResponse` is a sealed class (`Success` | `Error`). Forge provides functional operators to chain, transform, and combine responses without "Callback Hell."
+
+`map`: Transform the success body.
+
+`flatMap`: Chain a second API call dependent on the first.
+
+`onSuccess`: Perform a side-effect (like logging or caching).
+
+`zip`: Run multiple requests in parallel and combine the results.
+
+```kotlin
+class LoadDashboardUseCase(
+    private val userRepository: UserRepository,
+    private val walletRepository: WalletRepository,
+    private val analytics: AnalyticsService
+) : OutcomeUseCase<Unit, DashboardUiModel, DashboardError>() {
+
+    override suspend fun FlowCollector<Outcome<DashboardUiModel, DashboardError>>.execute(params: Unit) {
+        
+        // 1. Start with the User Profile (Sequential)
+        val result = userRepository.fetchProfile()
+            .flatMap { profile ->
+                // 2. Now that we have the profile, fetch dependent data in PARALLEL
+                zip(
+                  { walletRepository.fetchBalance(profile.accountId) },
+                  { walletRepository.fetchTransactions(profile.accountId) }
+                ) { balance, transactions ->
+                    // 3. Combine all data into a Domain Model
+                    DashboardDomainModel(profile, balance, transactions)
+                }
+            }
+            .onSuccess { dashboard ->
+                // 4. Side Effect: Log success without altering the data flow
+                analytics.logEvent("dashboard_loaded", mapOf("user_id" to dashboard.profile.id))
+            }
+            .map { domainModel ->
+                // 5. Transform Domain Model -> UI Model
+                DashboardUiModel(
+                    welcomeMessage = "Hello, ${domainModel.profile.firstName}",
+                    balance = "$${domainModel.balance.amount}",
+                    recentActivity = domainModel.transactions.take(5)
+                )
+            }
+
+        // 6. Emit the result (The UseCase handles the Outcome wrapping automatically)
+        emitFrom(result) { apiError ->
+            // Map HTTP errors to Domain errors if needed
+            DashboardError.LoadFailed(apiError.reason)
+        }
+    }
+}
+```
+
+#### 4. Authentication
+
+Forge provides a API to append and refresh bearer tokens. For this you simply need to implement the `TokenAuthenticator` interface. 
+
+```kotlin
+class TokenAuthenticatorImpl(
+    private val dataStore: DataStore,
+    private val sessionManagerHandler: SessionExpirationHandler,
+) : TokenAuthenticator {
+    override suspend fun loadTokens(authApiClient: ApiClient): AuthTokens? {
+        val access = dataStore
+            .get(AppDataEntry.AuthToken)
+            .takeUnless { it.isNullOrBlank() } ?: return null
+
+        val refresh = dataStore
+            .get(AppDataEntry.RefreshToken)
+            .takeUnless { it.isNullOrBlank() } ?: return null
+
+        return AuthTokens(
+            bearer = access,
+            refresh = refresh
+        )
+    }
+
+    override suspend fun refreshTokens(authApiClient: ApiClient): AuthTokens? {
+
+        val refresh = dataStore
+            .get(AppDataEntry.RefreshToken)
+            .takeUnless { it.isNullOrBlank() } ?: return null
+
+        val response = authApiClient.execute<TokenRefreshResponse, TokenRefresh>(
+            requestBuilder = {
+              method(HttpMethod.Get)
+              route(Api.Auth.Refresh)
+              header(HeaderValue.Bearer(refresh))
+            },
+          mapper = { it.toRefreshToken() },
+        }.onSuccess { refresh ->
+            dataStore.set(AppDataEntry.AuthToken, refresh.body.token)
+            dataStore.set(AppDataEntry.RefreshToken, refresh.body.refresh)
+        }
+
+        when (response) {
+            is ApiResponse.Error -> {
+                sessionManagerHandler.onSessionExpired()
+                return null
+            }
+
+            is ApiResponse.Success -> return AuthTokens(
+                bearer = response.body.token,
+                refresh = response.body.refresh
+            )
+        }
+
+    }
+}
+```
+
+Register it on the client with the `authentication` function. 
+Forge will now append bearers to every request when `loadTokens` returns a Token and automaticly trigger `refreshTokens` once the token expires.
+
+#### 4. Usage
+
+Forge provides a implementation of the network api using ktor. You can configure it like that
+
+```kotlin
+KtorApiClient {
+        authentication(get())
+        defaultHeaders {
+            append("X-App-Version", "1.0.0")
+        }
+    }
+```
+
+
+This returns a `HttpClientBundle`. The bundle contains the `HttpClient` and a instance of the `StateClearable`
+You can ignore the `StateClearable` unless you use the authentication API with the Ktor Client. 
+In this case the ktor modules provides a `KtorClientStateClearer` which clears Ktors internal `authProvider` state. 
+You'd need to call this when you want to logout a user for example
+
 
 ## 5. Dependency Guidelines
 
