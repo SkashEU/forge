@@ -592,7 +592,7 @@ class DummyRepositoryImpl(
         httpClient.execute<DummyPostResponse, List<DummyPost>>(
             requestBuilder = {
                 // The builder supports all standard verbs: get, post, put, patch, delete
-                get("[https://dummyjson.com/posts](https://dummyjson.com/posts)")
+                get("https://dummyjson.com/posts")
             },
             mapper = { response -> 
                 response.posts.map { it.toDummyPost() } 
