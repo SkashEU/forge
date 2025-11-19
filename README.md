@@ -10,157 +10,492 @@ It is built around Clean Architecture and focuses on:
 - A clear separation between **API contracts** and **implementation details** for critical infrastructure such as networking and persistence
 - APIs that are fully usable from **`commonMain`**, with platform‑specific details handled inside Forge modules
 
-## Third‑party dependency model
+## Table of Contents
 
-Forge does not try to completely eliminate direct third‑party dependencies in all modules. Some modules (for example, paging or view model integrations) may depend directly on external libraries where it is pragmatic.
+1. [Clean Architecture](#1-clean-architecture)
+2. [Project Structure & Modules](#2-project-structure--modules)
+3. [Architectural Blueprint](#3-architectural-blueprint)
+4. [Feature Examples](#4-feature-examples)
+5. [Dependency Guidelines](#5-dependency-guidelines)
 
-However, for key cross‑cutting concerns like **networking** and **data storage**, Forge deliberately separates **pure API modules** from **implementation modules**:
+### 1. Clean Architecture
+Forge separates code into distinct layers—**Domain, Data, and Presentation**. This makes your business logic easy to test and allows you to share the vast majority of your code across platforms.
 
-1. **API modules (no third‑party dependencies)**  
-   For networking and DataStore, Forge provides API modules that:
-    - Contain only Kotlin interfaces, models, and contracts.
-    - Do **not** depend on any third‑party library.
-    - Are safe to use as stable building blocks in any project, regardless of which underlying libraries you choose.
+### B. Strict API vs. Implementation Separation
+For critical infrastructure (Networking, DataStore, Navigation...), Forge radically decouples the **contract** from the **execution**.
 
-2. **Implementation modules (may use third‑party libraries)**  
-   For each of these APIs, there is at least one implementation module that:
-    - Depends on the corresponding API module.
-    - Uses a specific third‑party library (for example, a Ktor implementation for networking, or a settings library for DataStore).
-    - Can be replaced or swapped out without affecting modules that only depend on the API.
+* **API Modules:** Contain *only* interfaces and models. They have **zero** third-party dependencies. They are safe to use anywhere in your `commonMain`.
+* **Implementation Modules:** Implement the API using specific libraries (e.g., Ktor, OkHttp). These are treated as interchangeable "details."
 
-3. **Only API dependencies between Forge modules**  
-   When one Forge module needs functionality from another (for example, a domain module using networking or persistence), it:
-    - **Depends only on that module’s API**.
-    - **Never depends directly on a concrete implementation module.**
+> Your Domain and Data layers must depend **only** on API modules. They never know *which* library is performing the network request or saving the data.
 
-   This ensures that:
-    - Domain and presentation code stay completely agnostic of concrete libraries.
-    - Implementation choices can be changed, replaced, or customized without touching dependent modules.
-    - Testing is simplified, because test doubles can be plugged in at the API level.
+---
 
-Other Forge modules may bind more tightly to external libraries where it makes sense for ergonomics or integration (ViewModels for example)
+## 2. Project Structure & Modules
 
-## Project structure
+Forge is modular. You can adopt the entire framework or cherry-pick specific libraries to fit your existing architecture.
 
-The repository is organized into independent modules:
+| Module | Description
+| :--- | :--- |
+| **`outcome`** | Primitives for success, error, and progress handling. 
+| **`usecase`** | Base classes for business logic units of work.
+| **`viewmodel`** | Stateful abstractions for Unidirectional Data Flow (UDF). 
+| **`network`** | HTTP Client abstractions (**API**) and implementations.
+| **`datastore`** | Key-Value storage abstractions (**API**) and implementations.
+| **`navigation`** | Event-based navigation dispatching.
+| **`logger`** | Logging facades and platform writers.
+| **`event`** | Utilities for domain and application-wide events.
+| **`paging`** | Utilities for paginated data loading. 
 
-- `datastore` – API and implementations for multiplatform key–value storage.
-- `event` – event utilities (domain/application events).
-- `logger` – logging abstractions and implementations.
-- `navigation` – API and implementations for navigation events and dispatching.
-- `network` – API and implementations of a HTTP-Client.
-- `outcome` – success/error/progress wrapper primitives.
-- `paging` – paging utilities and abstractions.
-- `usecase` – base classes and helpers for use case‑oriented business logic.
-- `viewmodel` – stateful view model abstractions for unidirectional data flow.
+---
 
-You can use Forge as a whole, or pick individual modules (for example only `usecase` + `viewmodel`) and integrate them into an existing architecture.
+## 3. Architectural Blueprint
 
-## Key ideas
+Forge encourages a specific layering strategy to maximize code sharing and testability.
 
-### Clean Architecture: Domain, Data, Presentation & UI
+### I. Domain Layer (`commonMain`)
+* **Role:** The heart of the application. Contains business rules and logic.
+* **Components:** Use Cases, Domain Models, Repository Interfaces.
+* **Dependencies:** Only Forge **API** modules (e.g., `network-api`). **No** platform code.
 
-Forge explicitly encourages structuring your code according to Clean Architecture principles into three main layers:
+### II. Data Layer (`commonMain` + Platform)
+* **Role:** The implementation of the domain's requirements.
+* **Components:** Repositories, Mappers, Caching logic.
+* **Dependencies:** Forge **API** modules. It relies on implementations injected via the constructor.
 
-1. **Domain layer**
-    - Contains core business logic and rules.
-    - Implemented as use cases, domain models, and pure abstractions.
-    - Depends only on stable contracts (for example, networking or persistence APIs), never on concrete implementations.
+### III. Presentation Layer (`commonMain`)
+* **Role:** State management and UI coordination.
+* **Components:** ViewModels, UI State classes, Navigation events.
+* **Dependencies:** Domain layer and Forge primitives (`viewmodel`, `outcome`).
 
-2. **Data layer**
-    - Implements the abstractions used by the domain layer.
-    - Provides repositories, network and persistence implementations, caching, and integration with external systems.
-    - Adapts third‑party libraries (for example, HTTP clients, settings libraries) behind the API modules.
+### IV. Infrastructure / App Layer (Platform specific)
+* **Role:** The "Composition Root." It wires everything together.
+* **Components:** Dependency Injection (DI) modules, Platform entry points (Activity, Main).
+* **Dependencies:** This is the **only** place that imports Forge **Implementation** modules (e.g., `network-ktor`) to inject them into the Data layer.
 
-3. **Presentation layer**
-    - Contains stateful view models, navigation abstractions, and UI‑facing events.
-    - Orchestrates use cases, maps domain models to UI state, and drives navigation.
-    - Depends on domain and API contracts, not on concrete data implementations.
-    - Platform‑specific views and components (Compose UIs, SwiftUI, Android Views, web UI, etc.).
-    - Renders the current state and forwards user interactions as intents to the presentation layer.
-    - Contains no business logic; it is a pure consumer of presentation state.
+---
 
-This separation makes it easy to reason about responsibilities, replace implementations, and share most of the code across platforms.
+## 4. Feature Examples
 
-### Multiplatform architecture
+### Outcome & Use Cases
+Encapsulate business logic in a `UseCase` that returns an `Outcome`. This forces you to handle success and failure scenarios explicitly.
 
-### Use case–driven design
+The `OutcomeUseCase` requires three generic arguments to enforce type safety across your Clean Architecture layers.
 
-Use cases in Forge encapsulate a single unit of work (for example, “load user profile” or “update settings”) and:
+`OutcomeUseCase<Params, S, E>`
 
-- Expose a clear input/output contract.
-- Emit Outcome values to model success, error, or progress.
-- Are easy to test, as they are pure Kotlin classes with injected dependencies.
+1. **`Params` (Input Parameters)**
+   * **What it is:** The data required to execute the use case.
+   * **Usage:** These are passed as the argument to the `execute(params)` function.
+   * **Best Practice:** If you need multiple arguments, group them into a `data class` (e.g., `LoginParams`). If the use case requires no input, use `Unit`.
 
-### State‑focused view models
+2. **`S` (Success Type)**
+   * **What it is:** The data returned when the operation completes successfully.
+   * **Usage:** This becomes the `.data` property inside `Outcome.Success<S>`.
+   * **Best Practice:** This should be a Domain Model, not a raw DTO or API response object.
 
-View models keep UI state in a single source of truth and expose it as reactive streams. UI components observe this state and send user intents back to the view model, which:
-
-- Interprets intents.
-- Executes relevant use cases.
-- Reduces the state accordingly.
-- Optionally triggers navigation events.
-
-This results in a predictable, debuggable unidirectional data flow.
+3. **`E` (Error Type)**
+   * **What it is:** The specific type representing a failure in this business logic.
+   * **Usage:** This becomes the `.error` property inside `Outcome.Error<E>`.
+   * **Best Practice:** Avoid using generic `Throwable` or `Exception`. Instead, use a **sealed interface** or **enum** (e.g., `LoginError.InvalidCredentials`) to force the UI to handle specific failure scenarios explicitly.
 
 
-## 2. APIs vs implementations
+#### 1. Basic Implementation
 
-For **networking**, **navigation** and **DataStore**, Forge follows a strict pattern:
+```kotlin
+class UpdateProfileUseCase : OutcomeUseCase<ProfileParams, UserProfile, ProfileError>() {
 
-- An **API module**:
-  - Lives in shared code.
-  - Contains interfaces and models only.
-  - Has **no third‑party dependencies**.
-  - Is safe to use in Domain, Data, and Presentation layers in `commonMain`.
+    // 1. The 'Params' type is used here as the argument
+    override suspend fun FlowCollector<Outcome<UserProfile, ProfileError>>.execute(params: ProfileParams) {
+        
+        if (params.name.isEmpty()) {
+            // 3. The 'Error' type is emitted here
+            emitFailure(ProfileError.NameEmpty) 
+            return
+        }
 
-- One or more **implementation modules**:
-  - Provide concrete implementations of the API using third‑party libraries (for example, HTTP client or settings library).
+        val updatedProfile = api.update(params)
 
-Forge itself only depends across modules via these **API surfaces**. The same rule is recommended for your code:
+        // 2. The 'Success' type is emitted here
+        emitSuccess(updatedProfile) 
+    }
+}
+```
 
-- **Domain modules** depend only on Forge APIs and your own abstractions.
-- **Data modules** depend only on Forge APIs and your own abstractions.
-- **No Domain or Data module should depend directly on a Forge implementation module.**
 
-Best practice is to:
+2. Handling Exceptions safely (`emitCatching`)
 
-- Treat Forge implementation modules as **infrastructure details**.
-- Reference them only from your **app / composition / infrastructure modules** (for example, the Android app module, iOS app, or backend host), where you wire concrete implementations into DI or manual wiring.
+Avoid try-catch blocks by using `emitCatching`. It executes the block, captures exceptions, and maps them to your specific domain error type.
 
-This ensures that:
+```kotlin
+class ReadFileUseCase(
+    private val fileManager: FileManager
+) : OutcomeUseCase<String, String, FileError>() {
 
-- Domain, Data, and Presentation code stay independent of concrete libraries.
-- You can swap implementations (for example, changing your HTTP client or DataStore backend) without touching Domain or Data modules.
-- The entire Forge API surface is usable from `commonMain`.
+    override suspend fun FlowCollector<Outcome<String, FileError>>.execute(fileName: String) {
+        // Tries to read the file. If an IOException occurs, it maps to FileError.ReadFailed
+        emitCatching(
+            errorMapper = { throwable -> FileError.ReadFailed(throwable.message) },
+            block = { fileManager.readText(fileName) }
+        )
+    }
+}
+```
 
-## 3. Structure your app with Clean Architecture
+3. Integrating Network Responses (`emitFrom`)
+   
+When working with the Forge Network module, `emitFrom` automatically unpacks an `ApiResponse`, handling the Success/Error branching for you.
 
-Forge encourages the following layering:
+```kotlin
+class FetchUserUseCase(
+    private val userRepository: UserRepository
+) : OutcomeUseCase<String, User, UserError>() {
 
-1. **Domain layer (commonMain)**
-   - Use cases and domain models.
-   - Depends only on Forge API modules (for example, networking and DataStore APIs) and your own domain abstractions.
-   - Contains no platform code and no third‑party dependencies beyond what you explicitly choose.
+    override suspend fun FlowCollector<Outcome<User, UserError>>.execute(userId: String) {
+        val apiResponse = userRepository.fetchUser(userId)
+        
+        // Automatically emits Success(User) OR Failure(UserError)
+        emitFrom(apiResponse) { apiError ->
+            // Map the network error (HTTP 404, 500, etc.) to a Domain Error
+            when (apiError.code) {
+                404 -> UserError.NotFound
+                else -> UserError.Unknown
+            }
+        }
+    }
+}
+```
 
-2. **Data layer (commonMain + platform source sets)**
-   - Implements the contracts defined in Forge API modules and your own repository interfaces.
-   - Provides repositories and composition logic that rely on injected abstractions.
-   - **Should not depend directly on Forge implementation modules.**
-   - Instead, receives concrete implementations via constructor/D.I. from app or infrastructure modules.
+4. Consuming the Use Case
 
-3. **Presentation layer (commonMain)**
-   - View models, navigation abstractions, and UI events.
-   - Uses Forge’s `:viewmodel`, `:navigation`, `:event`, `:usecase`, and `:outcome` modules.
-   - Coordinates use cases and maps domain data to UI state.
-   - Exposes state flows and events to the UI.
-   - Depends only on APIs (Forge and your own), never on concrete implementations.
-   - Platform‑specific UI (Compose, SwiftUI, web UI, etc.) or Compose Multiplatform.
-   - Collects state and events from view models.
-   - Sends user interactions back as intents.
-   - Contains no business logic.
+Since `OutcomeUseCase` returns a `Flow`, it integrates naturally with `ViewModels`and especialy when using Forges `StateViewModel`.
 
-4. **infrastructure layer (platform source sets / app modules)**
-   - Infrastructure / app modules that:
-     - Pull in Forge implementation modules.
-     - Bind API interfaces to implementations via DI or manual wiring.
+When you dont want to use the `StateViewModel`you can consume the UseCase like this
+
+```kotlin
+// In your ViewModel
+fun increaseCount(currentCount: Int) {
+    viewModelScope.launch {
+        increaseCounterUseCase(IncreaseCounterUseCase.Params(currentCount))
+            .collect { result ->
+                when (result) {
+                    is Outcome.Progress -> updateState { it.copy(isLoading = true) }
+                    is Outcome.Success -> updateState { it.copy(isLoading = false, message = "Done!") }
+                    is Outcome.Error -> updateState { it.copy(isLoading = false, error = result.error) }
+                }
+            }
+    }
+}
+```
+
+
+with the `StateViewModel`you can a few helper functions to consume UseCases
+
+1. consuming long running flows of data (like observing a specific datastore key or local db changes)
+
+```kotlin
+private val posts = getDummyPostsUseCase(Unit)
+        .onEachOutcome(
+            onProgress = { setState(ExampleState.Loading) },
+            onFailure = { sendUIEvent(UIEvent.Snackbar(it.message)) },
+            onSuccess = { posts ->
+                reduceStateOrCreate<ExampleState.Success>(
+                    reducer = { copy(posts = posts) },
+                    create = { ExampleState.Success(posts = posts) }
+                )
+            }
+        )
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null
+        )
+```
+
+2. Directly consuming a UseCase
+
+```kotlin
+viewModelScope.launch {
+   decreaseCounterUseCase.invoke(state.count)
+      .collectOutcome(
+         onProgress = { setState(DetailState.Loading) },
+         onSuccess = { setState(DetailState.Details(it)) },
+         onFailure = { sendUIEvent(UIEvent.Snackbar(it.message)) }
+      )
+}
+```
+
+
+### StateViewModel & UDF
+
+The `StateViewModel` is the core of the Presentation layer. It enforces a strict Unidirectional Data Flow by ensuring that the View only observes **State** and sends **Intents**. It also includes built-in support for state caching (restoration), navigation, and one-off events.
+
+**Key Features:**
+* **Type-Safe Reducers:** Update state only if the current state matches a specific type (e.g., only update a counter if the state is `Loaded`).
+* **State Machine Logic:** Process specific Intents only when in specific States via `handleIntent`.
+* **State Caching:** Automatically caches previous state types to allow easy restoration (e.g., returning from a detail screen).
+* **Navigation & Events:** Built-in dispatchers for routing and one-off UI events (Snackbars, Toasts).
+* **Navigation Results:** Callback for Type-Safe navigation results triggered by other screens (NavBackStackEntry).
+ 
+You normaly would want to create your own abstract BaseViewModel because the `StateViewModel` requires some dependencies that are easier to manage when having a BaseViewModel.
+All examples will use exactly these BaseViewmodel:
+
+```kotlin
+abstract class BaseViewModel<State : Any, Intent> : StateViewModel<State, Intent, UIEvent> {
+    constructor(initialState: State, eventBus: EventBus<UIEvent>?) : super(
+        initialState = initialState,
+        eventBus = eventBus,
+        navigationDispatcher = resolveNavigationDispatcher(),
+    )
+
+    constructor(initialState: State, useEventBus: Boolean = true) : this(
+        initialState = initialState,
+        eventBus = if (useEventBus) resolveEventBus() else null,
+    )
+
+    private companion object Companion : KoinComponent {
+        fun resolveEventBus(): EventBus<UIEvent> = get()
+
+        fun resolveNavigationDispatcher(): NavigationDispatcher = get()
+    }
+}
+```
+
+```kotlin
+abstract class BaseViewModelWithNavResult<State : Any, Intent, NavResult : Any> :
+    NavResultAwareStateViewModel<State, Intent, UIEvent, NavResult> {
+    constructor(initialState: State, eventBus: EventBus<UIEvent>?) : super(
+        initialState = initialState,
+        eventBus = eventBus,
+        navigationDispatcher = resolveNavigationDispatcher(),
+    )
+
+    constructor(initialState: State, useEventBus: Boolean = true) : this(
+        initialState = initialState,
+        eventBus = if (useEventBus) resolveEventBus() else null,
+    )
+
+    private companion object Companion : KoinComponent {
+        fun resolveEventBus(): EventBus<UIEvent> = get()
+
+        fun resolveNavigationDispatcher(): NavigationDispatcher = get()
+    }
+}
+```
+
+```kotlin
+// 1. Define the Contract
+sealed interface DetailState {
+    data object Loading : DetailState
+    
+    // Scoped Intents: These actions are only valid when the screen is in 'Details' state
+    data class Details(val count: Int) : DetailState {
+        sealed interface Intent : DetailState.Intent {
+            data object IncreaseCounter : Intent
+            data object DecreaseCounter : Intent
+            data object NavigateBack : Intent
+        }
+    }
+    
+    // Base Intent Interface
+    interface Intent
+}
+```
+
+2. Implement the ViewModel
+
+This example demonstrates observing a use case, handling intent-state matching, and managing navigation results.
+
+```kotlin
+class DetailViewModel(
+    count: Int,
+    observeCounterUseCase: ObserveCounterUseCase,
+    private val increaseCounterUseCase: IncreaseCounterUseCase,
+    private val decreaseCounterUseCase: DecreaseCounterUseCase
+) : BaseViewModel<DetailState, DetailState.Intent>(initialState = DetailState.Details(count = count)) {
+
+    // 1. Reactive State Management
+    // We listen to a UseCase Flow and update the UI state automatically.
+    private val currentCount = observeCounterUseCase(Unit)
+        .onEach {
+            reduceStateOrCreate<DetailState.Details>(
+                reducer = { copy(count = it) },
+                create = { DetailState.Details(it) }
+            )
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null
+        )
+
+    // 2. The Entry Point (State Machine)
+    override fun executeIntent(intent: DetailState.Intent) = when (intent) {
+        // use handleIntent to ensure we are in the correct state before processing
+        is DetailState.Details.Intent.DecreaseCounter -> handleIntent<_, _>(
+            intent = intent,
+            handler = ::handleDecreaseCounter
+        )
+
+        is DetailState.Details.Intent.IncreaseCounter -> handleIntent<_, _>(
+            intent = intent,
+            handler = ::handleIncreaseCounter
+        )
+
+        is DetailState.Details.Intent.NavigateBack -> handleIntent<_, _>(
+            intent = intent,
+            handler = ::handleNavigateUp
+        )
+        // If we receive an Intent not valid for the current state, handleIntent
+        // automatically calls handleInvalidState().
+        // This functions throws per default but should get overridden in production
+    }
+
+    // 3. Intent Handlers
+    private fun handleDecreaseCounter(
+        state: DetailState.Details,
+        intent: DetailState.Details.Intent.DecreaseCounter
+    ) {
+        // 'collectOutcome' is a Forge helper to handle Success/Error/Progress easily
+        viewModelScope.launch {
+            decreaseCounterUseCase.invoke(DecreaseCounterUseCase.DecreaseCounterParams(state.count))
+                .collectOutcome(onProgress = { setState(DetailState.Loading) })
+        }
+    }
+
+    private fun handleIncreaseCounter(
+        state: DetailState.Details,
+        intent: DetailState.Details.Intent.IncreaseCounter
+    ) {
+        viewModelScope.launch {
+            increaseCounterUseCase.invoke(IncreaseCounterUseCase.IncreaseCounterParams(state.count))
+                .collectOutcome(onProgress = { setState(DetailState.Loading) })
+        }
+    }
+    
+    // 4. Navigation with Results
+    private fun handleNavigateUp(
+        state: DetailState.Details,
+        intent: DetailState.Details.Intent.NavigateBack
+    ) = dispatchNavigationEvent(
+        event = NavigationEvent.NavigateUpWithResult(
+            key = NavigationResult.ExampleNavResult, // Type-safe key
+            value = state.count
+        )
+    )
+}
+```
+
+### Navigation & Results
+Forge decouples navigation logic from the UI. ViewModels simply "request" navigation via events, and the UI layer (Compose, SwiftUI, Fragment) observes and executes them.
+
+Crucially, Forge provides a standardized way to pass data **back** from a screen (like `startActivityForResult` or `setFragmentResult`), which works seamlessly across platforms.
+This API does not depend on any navigation library. Forge provides a implementation of the API using the Nav2 androidx libraries fork by jetbrains that supports all targeted platforms. 
+I might add alternatives later. You can ofc implement the API by yourself using any other library.
+
+
+### Navigation & Typed Results
+
+#### 1. Define Global Keys
+First, define a central registry of keys. By inheriting from `NavResultKey<T>`, you enforce that a specific key always carries a specific type of data (e.g., `Int`), preventing runtime casting errors.
+
+```kotlin
+// Global file: NavigationResult.kt
+sealed class NavigationResult<T>(
+    key: String,
+) : NavResultKey<T>(key) {
+    // Defined globally, reusable across modules if needed
+    data object ExampleNavResult : NavigationResult<Int>("example_nav_result")
+}
+```
+
+#### 2. Define the Result Contract per feature
+Create a sealed interface representing the possible results a flow can return. Primitives and kotlinx serialziables are supported
+
+```kotlin
+sealed interface MainNavigationResult {
+    data class CounterUpdated(val count: Int) : MainNavigationResult
+}
+```
+
+#### 3. Dispatching Navigation
+As seen in the `DetailViewModel` example, you dispatch events using `dispatchNavigationEvent`.
+
+```kotlin
+// In DetailViewModel
+fun saveAndExit(count: Int) {
+     dispatchNavigationEvent(
+        event = NavigationEvent.NavigateUpWithResult(
+            key = NavigationResult.ExampleNavResult, // Type-safe key
+            value = state.count
+      )
+}
+```
+
+#### 4. Receiving the Result
+The receiving ViewModel inherits from NavResultAwareStateViewModel. You specify the expected result type as a generic argument (MainNavigationResult in this case).
+
+The onNavResultReceived function is the entry point. Using reduceStateOrCreate is highly recommended here: it handles cases where the parent screen might be in a Loading or Empty state when the result arrives, ensuring the state is correctly initialized or updated.
+
+```kotlin
+
+class MainViewModel(
+    getDummyPostsUseCase: GetDummyPostsUseCase
+) : BaseViewModelWithNavResult<ExampleState, ExampleState.Intent, MainNavigationResult>(
+    initialState = ExampleState.Loading,
+) {
+   override fun onNavResultReceived(event: MainNavigationResult) = when (event) {
+        is MainNavigationResult.ExampleEvent -> reduceStateOrCreate<ExampleState.Success>(
+            reducer = { copy(count = event.count) },
+            create = { ExampleState.Success(count = event.count) }
+        )
+    }
+}
+```
+
+#### 5. Wiring it up in Compose (Nav2 Integration)
+Finally, you need to bridge the platform's navigation system with your ViewModel. Forge's Nav2 implementation provides the HandleNavResults composable.
+
+This block listens to the savedStateHandle of the current backStackEntry and maps raw results into your typed MainNavigationResult events.
+This allows you to have a app wide list of events (NavigationResult) that does not depend on any feature because you dont want to build relations between feature.
+
+
+
+```kotlin
+composable<AppScreen.Main> { backStackEntry ->
+
+    val viewModel = koinViewModel<MainViewModel>()
+
+    HandleNavResults(
+        handle = backStackEntry.savedStateHandle,
+        onResult = viewModel::onNavResultReceived
+    ) {
+        // Register the expected results
+        OnResult(
+            navResult = NavigationResult.ExampleNavResult, 
+            mapper = { count -> 
+                // 'count' is automatically cast to Int here because ExampleNavResult is Key<Int>
+                MainNavigationResult.ExampleEvent(count) 
+            }
+        )
+    }
+
+    MainScreen(viewModel)
+}
+```
+
+## 5. Dependency Guidelines
+
+To maintain architectural integrity, follow these strict dependency rules:
+
+1. **Domain Modules:**
+    * ✅ Depends on `network-api`, `datastore-api`, `usecase`, `outcome`.
+    * ❌ **Never** depends on `network-ktor` or `datastore-multiplatformsettings`.
+
+2. **Data Modules:**
+    * ✅ Depends on Domain modules and Forge APIs.
+    * ❌ **Never** depends on implementation modules. It receives the implementation instances via the constructor.
+
+3. **App Module (The Root):**
+    * ✅ Depends on everything.
+    * This is where you import `network-ktor` and bind it to the `HttpClientApi` interface in your Dependency Injection graph.
