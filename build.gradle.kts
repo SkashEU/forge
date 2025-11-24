@@ -12,6 +12,7 @@ plugins {
     alias(libs.plugins.jetbrainsKotlinJvm) apply false
 }
 
+
 subprojects {
     plugins.withId("maven-publish") {
         afterEvaluate {
@@ -20,7 +21,7 @@ subprojects {
                     val basePath = project.path.removePrefix(":").replace(':', '-')
 
                     groupId = "com.skash.forge"
-                    version = rootProject.version.toString()
+                    version =  System.getenv("CI_VERSION") ?: "0.0.1-SNAPSHOT"
 
                     artifactId =
                         when (name) {
