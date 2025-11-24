@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*.*.*_*'
+
+jobs:
+  release:
+    runs-on: macos-latest
+    
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Extract tag and version
+        id: extract
+        run: |
+          echo "tag_name=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          echo "version_name=${GITHUB_REF_NAME%%_*}" >> $GITHUB_OUTPUT
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Publish to Github Packages
+        run: ./gradlew publishAllPublicationsToGitHubPackagesRepository
+        env:
+          GITHUB_ACTOR: ${{ github.actor_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.extract.outputs.tag_name }}
+          name: Release ${{ steps.extract.outputs.version_name }}
+          body: "Automated release for version ${{ steps.extract.outputs.version_name }}"
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}

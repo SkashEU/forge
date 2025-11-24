@@ -2,6 +2,7 @@ rootProject.name = "forge"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             mavenContent {
@@ -32,4 +33,19 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":composeApp")
+include(":examples:composeApp")
+include(":network:api:client")
+include(":network:api:request")
+include(":network:api:session")
+include(":network:api:response")
+include(":network:ktor")
+include(":outcome")
+include(":viewmodel")
+include(":logger")
+include(":event")
+include(":usecase")
+include(":paging")
+include(":datastore:api")
+include(":datastore:multiplatform-settings")
+include(":navigation:api")
+include(":navigation:nav2")
