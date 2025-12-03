@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onStart
 
-abstract class OutcomeUseCase<in Params, S : Any, E>(
+abstract class FlowOutcomeUseCase<in Params, S : Any, E>(
     dispatcher: CoroutineDispatcher = defaultDispatcher,
     private val emitProgressOnStart: Boolean = true
-) : UseCase<Params, Outcome<S, E>>(dispatcher) {
+) : FlowUseCase<Params, Outcome<S, E>>(dispatcher) {
 
     protected abstract suspend fun FlowCollector<Outcome<S, E>>.execute(params: Params)
 
@@ -58,3 +58,5 @@ abstract class OutcomeUseCase<in Params, S : Any, E>(
         }
     }
 }
+
+operator fun <Output: Any, Error> FlowOutcomeUseCase<Unit, Output, Error>.invoke(): Flow<Outcome<Output, Error>> = invoke(Unit)

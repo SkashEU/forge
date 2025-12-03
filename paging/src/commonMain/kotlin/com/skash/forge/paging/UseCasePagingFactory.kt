@@ -5,7 +5,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.skash.forge.outcome.Outcome
-import com.skash.forge.usecase.OutcomeUseCase
+import com.skash.forge.usecase.FlowOutcomeUseCase
 import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.first
 
@@ -14,7 +14,7 @@ object UseCasePagingFactory {
     fun <K : Any, P : Any, S : Any, T : Any, E> create(
         config: PagingConfig,
         startingKey: K,
-        useCase: OutcomeUseCase<P, S, E>,
+        useCase: FlowOutcomeUseCase<P, S, E>,
         paramsFactory: (key: K?, loadSize: Int) -> P,
         getItems: (successData: S) -> List<T>,
         getNextKey: (successData: S, currentKey: K) -> K?,
@@ -38,7 +38,7 @@ object UseCasePagingFactory {
 
 class GenericUseCasePagingSource<Key : Any, Params, S : Any, T : Any, E>(
     private val startingKey: Key,
-    private val useCase: OutcomeUseCase<Params, S, E>,
+    private val useCase: FlowOutcomeUseCase<Params, S, E>,
     private val paramsFactory: (key: Key?, loadSize: Int) -> Params,
     private val getItems: (successData: S) -> List<T>,
     private val getNextKey: (successData: S, currentKey: Key) -> Key?,
