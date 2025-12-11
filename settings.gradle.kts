@@ -38,6 +38,8 @@ include(":network:api:client")
 include(":network:api:request")
 include(":network:api:session")
 include(":network:api:response")
+include(":network:api:logging")
+
 include(":network:ktor")
 include(":outcome")
 include(":viewmodel")

@@ -4,6 +4,7 @@ import com.skash.forge.network.request.ApiRequest
 import com.skash.forge.network.request.HttpHeader
 import com.skash.forge.network.request.HttpMethod
 import com.skash.forge.network.request.Route
+import com.skash.forge.network.request.formdata.MultipartPayload
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
@@ -35,6 +36,19 @@ class ApiRequestBuilder {
             kClass = T::class,
             kType = typeOf<T>()
         )
+    }
+
+    fun multipartBody(block: MultipartBodyBuilder.() -> Unit) {
+        val builder = MultipartBodyBuilder()
+        builder.block()
+        val payload = builder.build()
+
+        this.requestBody =
+            RequestBody(
+                instance = payload,
+                kClass = MultipartPayload::class,
+                kType = typeOf<MultipartPayload>(),
+            )
     }
 
     fun header(key: String, value: String) {

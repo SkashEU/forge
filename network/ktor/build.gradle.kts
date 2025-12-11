@@ -25,6 +25,9 @@ kotlin {
 
                 api(projects.network.api.client)
                 api(projects.network.api.session)
+                api(projects.logger)
+                api(projects.network.api.logging)
+
             }
         }
 
