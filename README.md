@@ -16,11 +16,11 @@ It is built around Clean Architecture and focuses on:
 2. [Project Structure & Modules](#2-project-structure--modules)
 3. [Architectural Blueprint](#3-architectural-blueprint)
 4. [Feature Examples](#4-feature-examples)
-   - [UseCases & Outcome](#usecases--outcome)
-   - [StateViewModel & UDF](#stateviewmodel--udf)
-   - [Navigation & Typed Results](#navigation--typed-results)
-   - [DataStore & Type-Safe Persistence](#datastore--type-safe-persistence)
-   - [Network & HttpClient](#network--httpclient)
+    - [UseCases & Outcome](#usecases--outcome)
+    - [StateViewModel & UDF](#stateviewmodel--udf)
+    - [Navigation & Typed Results](#navigation--typed-results)
+    - [DataStore & Type-Safe Persistence](#datastore--type-safe-persistence)
+    - [Network & HttpClient](#network--httpclient)
 5. [Dependency Guidelines](#5-dependency-guidelines)
 
 ### 1. Clean Architecture
@@ -85,30 +85,30 @@ Forge encourages a specific layering strategy to maximize code sharing and testa
 ### UseCases & Outcome
 Encapsulate business logic in a `UseCase` that returns an `Outcome`. This forces you to handle success and failure scenarios explicitly.
 
-The `OutcomeUseCase` requires three generic arguments to enforce type safety across your Clean Architecture layers.
+The `FlowOutcomeUseCase` requires three generic arguments to enforce type safety across your Clean Architecture layers.
 
-`OutcomeUseCase<Params, S, E>`
+`FlowOutcomeUseCase<Params, S, E>`
 
 1. **`Params` (Input Parameters)**
-   * **What it is:** The data required to execute the use case.
-   * **Usage:** These are passed as the argument to the `execute(params)` function.
-   * **Best Practice:** If you need multiple arguments, group them into a `data class` (e.g., `LoginParams`). If the use case requires no input, use `Unit`.
+    * **What it is:** The data required to execute the use case.
+    * **Usage:** These are passed as the argument to the `execute(params)` function.
+    * **Best Practice:** If you need multiple arguments, group them into a `data class` (e.g., `LoginParams`). If the use case requires no input, use `Unit`.
 
 2. **`S` (Success Type)**
-   * **What it is:** The data returned when the operation completes successfully.
-   * **Usage:** This becomes the `.data` property inside `Outcome.Success<S>`.
-   * **Best Practice:** This should be a Domain Model, not a raw DTO or API response object.
+    * **What it is:** The data returned when the operation completes successfully.
+    * **Usage:** This becomes the `.data` property inside `Outcome.Success<S>`.
+    * **Best Practice:** This should be a Domain Model, not a raw DTO or API response object.
 
 3. **`E` (Error Type)**
-   * **What it is:** The specific type representing a failure in this business logic.
-   * **Usage:** This becomes the `.error` property inside `Outcome.Error<E>`.
-   * **Best Practice:** Avoid using generic `Throwable` or `Exception`. Instead, use a **sealed interface** or **enum** (e.g., `LoginError.InvalidCredentials`) to force the UI to handle specific failure scenarios explicitly.
+    * **What it is:** The specific type representing a failure in this business logic.
+    * **Usage:** This becomes the `.error` property inside `Outcome.Error<E>`.
+    * **Best Practice:** Avoid using generic `Throwable` or `Exception`. Instead, use a **sealed interface** or **enum** (e.g., `LoginError.InvalidCredentials`) to force the UI to handle specific failure scenarios explicitly.
 
 
 #### 1. Basic Implementation
 
 ```kotlin
-class UpdateProfileUseCase : OutcomeUseCase<ProfileParams, UserProfile, ProfileError>() {
+class UpdateProfileUseCase : FlowOutcomeUseCase<ProfileParams, UserProfile, ProfileError>() {
 
     // 1. The 'Params' type is used here as the argument
     override suspend fun FlowCollector<Outcome<UserProfile, ProfileError>>.execute(params: ProfileParams) {
@@ -135,7 +135,7 @@ Avoid try-catch blocks by using `emitCatching`. It executes the block, captures 
 ```kotlin
 class ReadFileUseCase(
     private val fileManager: FileManager
-) : OutcomeUseCase<String, String, FileError>() {
+) : FlowOutcomeUseCase<String, String, FileError>() {
 
     override suspend fun FlowCollector<Outcome<String, FileError>>.execute(fileName: String) {
         // Tries to read the file. If an IOException occurs, it maps to FileError.ReadFailed
@@ -148,13 +148,13 @@ class ReadFileUseCase(
 ```
 
 #### 3. Integrating Network Responses (`emitFrom`)
-   
+
 When working with the Forge Network module, `emitFrom` automatically unpacks an `ApiResponse`, handling the Success/Error branching for you.
 
 ```kotlin
 class FetchUserUseCase(
     private val userRepository: UserRepository
-) : OutcomeUseCase<String, User, UserError>() {
+) : FlowOutcomeUseCase<String, User, UserError>() {
 
     override suspend fun FlowCollector<Outcome<User, UserError>>.execute(userId: String) {
         val apiResponse = userRepository.fetchUser(userId)
@@ -173,7 +173,7 @@ class FetchUserUseCase(
 
 #### 4. Consuming the Use Case
 
-Since `OutcomeUseCase` returns a `Flow`, it integrates naturally with `ViewModels`and especialy when using Forges `StateViewModel`.
+Since `FlowOutcomeUseCase` returns a `Flow`, it integrates naturally with `ViewModels`and especialy when using Forges `StateViewModel`.
 
 When you dont want to use the `StateViewModel`you can consume the UseCase like this
 
@@ -228,6 +228,57 @@ viewModelScope.launch {
 }
 ```
 
+### Alternative Usecases
+Forge comes with two alternative types of UseCase. `UseCase` for one-shot suspendable operations and `FlowUseCase` for reactive streams.
+
+#### 1. UseCase
+
+The `UseCase<Params, Output, Error>` class provides a structured way to execute synchronous or asynchronous logic while enforcing typed error handling.
+It returns a `ResultOutcome<Output, Error>` rather than throwing exceptions, promoting safer, predictable control flow.
+
+````kotlin
+class LoginUser(
+    private val repo: UserRepository
+) : UseCase<LoginParams, User, LoginError>() {
+
+    override suspend fun UseCaseScope<LoginError>.execute(params: LoginParams): User {
+        // 1. Validation (Short-circuits if false)
+        ensure(params.email.isNotEmpty()) { LoginError.EmptyEmail }
+        
+        // 2. Safe execution (Catches exceptions)
+        val rawUser = catch(
+            block = { repo.fetchUser(params.email) },
+            mapper = { LoginError.NetworkError }
+        )
+
+        if (rawUser.password != params.password) {
+            raise(LoginError.WrongPassword)
+        }
+
+        return rawUser
+    }
+
+    // Handle unexpected crashes (e.g., OOM, weird parsing errors)
+    override fun mapError(t: Throwable): LoginError = LoginError.Unknown(t)
+}
+````
+
+#### 2. FlowUseCase
+
+The `FlowUseCase<Params, Output>` is a lightweight wrapper for operations that return a stream of data.
+
+````kotlin
+class ObserveUserBalance(
+    private val repo: WalletRepository
+) : FlowUseCase<String, Double>() {
+
+    override fun execute(params: String): Flow<Double> {
+        return repo.getBalanceFlow(userId = params)
+            .map { it.amount }
+    }
+}
+````
+
 
 ### StateViewModel & UDF
 
@@ -239,7 +290,7 @@ The `StateViewModel` is the core of the Presentation layer. It enforces a strict
 * **State Caching:** Automatically caches previous state types to allow easy restoration (e.g., returning from a detail screen).
 * **Navigation & Events:** Built-in dispatchers for routing and one-off UI events (Snackbars, Toasts).
 * **Navigation Results:** Callback for Type-Safe navigation results triggered by other screens (NavBackStackEntry).
- 
+
 You normaly would want to create your own abstract BaseViewModel because the `StateViewModel` requires some dependencies that are easier to manage when having a BaseViewModel.
 All examples will use exactly these BaseViewmodel:
 
@@ -393,7 +444,7 @@ class DetailViewModel(
 Forge decouples navigation logic from the UI. ViewModels simply "request" navigation via events, and the UI layer (Compose, SwiftUI, Fragment) observes and executes them.
 
 Crucially, Forge provides a standardized way to pass data **back** from a screen (like `startActivityForResult` or `setFragmentResult`), which works seamlessly across platforms.
-This API does not depend on any navigation library. Forge provides a implementation of the API using the Nav2 androidx libraries fork by jetbrains that supports all targeted platforms. 
+This API does not depend on any navigation library. Forge provides a implementation of the API using the Nav2 androidx libraries fork by jetbrains that supports all targeted platforms.
 I might add alternatives later. You can ofc implement the API by yourself using any other library.
 
 
@@ -530,7 +581,7 @@ Inject the `DataStore` interface into your UseCases. Because `AppDataEntry.Count
 ```kotlin
 class DecreaseCounterUseCase(
     private val dataStore: DataStore
-): OutcomeUseCase<Int, Unit, String>() {
+): FlowOutcomeUseCase<Int, Unit, String>() {
 
     override suspend fun FlowCollector<Outcome<Unit, String>>.execute(params: Int) {
         emitSuccess(dataStore.set(AppDataEntry.Count, params - 1))
@@ -556,9 +607,9 @@ class ObserveCounterUseCase(
 
 ##### 4. Creating a DataStore
 
-Forge comes with the `datastore:multiplatform-settings` module that implementes the `:datastore:api`. 
+Forge comes with the `datastore:multiplatform-settings` module that implementes the `:datastore:api`.
 Forge uses the androidx DataStore backend for Android, JVM & iOS. On web its a wrapper around LocalStorage.
-You should only create a `DataStore` as singleton and inject it into all the classes that need it. 
+You should only create a `DataStore` as singleton and inject it into all the classes that need it.
 Creating multible instances will break the observing for the web targets.
 
 You can create it like this when using the `multiplatform-settings`
@@ -618,6 +669,11 @@ httpClient.execute<UserDto, User>(
         // Type-safe body serialization
         body(CreateUserRequest(name = "John"))
         
+        // formdata serialization
+        formData {
+            add("key", "value")
+        }
+        
         // Headers & Parameters
         header("Authorization", "Bearer xyz")
         parameters {
@@ -644,7 +700,7 @@ class LoadDashboardUseCase(
     private val userRepository: UserRepository,
     private val walletRepository: WalletRepository,
     private val analytics: AnalyticsService
-) : OutcomeUseCase<Unit, DashboardUiModel, DashboardError>() {
+) : FlowOutcomeUseCase<Unit, DashboardUiModel, DashboardError>() {
 
     override suspend fun FlowCollector<Outcome<DashboardUiModel, DashboardError>>.execute(params: Unit) {
         
@@ -684,7 +740,7 @@ class LoadDashboardUseCase(
 
 #### 4. Authentication
 
-Forge provides a API to append and refresh bearer tokens. For this you simply need to implement the `TokenAuthenticator` interface. 
+Forge provides a API to append and refresh bearer tokens. For this you simply need to implement the `TokenAuthenticator` interface.
 
 ```kotlin
 class TokenAuthenticatorImpl(
@@ -740,7 +796,7 @@ class TokenAuthenticatorImpl(
 }
 ```
 
-Register it on the client with the `authentication` function. 
+Register it on the client with the `authentication` function.
 Forge will now append bearers to every request when `loadTokens` returns a Token and automaticly trigger `refreshTokens` once the token expires.
 
 #### 4. Usage
@@ -758,8 +814,8 @@ KtorApiClient {
 
 
 This returns a `HttpClientBundle`. The bundle contains the `HttpClient` and a instance of the `StateClearable`
-You can ignore the `StateClearable` unless you use the authentication API with the Ktor Client. 
-In this case the ktor modules provides a `KtorClientStateClearer` which clears Ktors internal `authProvider` state. 
+You can ignore the `StateClearable` unless you use the authentication API with the Ktor Client.
+In this case the ktor modules provides a `KtorClientStateClearer` which clears Ktors internal `authProvider` state.
 You'd need to call this when you want to logout a user for example
 
 
