@@ -108,8 +108,8 @@ internal actual class Lock {
 
     @OptIn(ExperimentalStdlibApi::class, ExperimentalNativeApi::class)
     private val cleaner =
-        createCleaner(arena) {
-            pthread_mutex_destroy(mutex.ptr)
-            it.clear()
+        createCleaner(arena to mutex.ptr) { (arena, mutexPtr) ->
+            pthread_mutex_destroy(mutexPtr)
+            arena.clear()
         }
 }
