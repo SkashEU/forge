@@ -73,12 +73,13 @@ abstract class StateViewModel<State : Any, Intent, Event : Any>(
     private val eventBus: EventBus<Event>? = null,
     private val navigationDispatcher: NavigationDispatcher,
     private val stateCacheSize: Int = 10,
-    private val logger: Logger = DefaultLogger,
+    @PublishedApi internal val logger: Logger = DefaultLogger,
 ) : ViewModel() {
     /**
      * The current mutable state holder. Use [collectStateFlow] to observe changes.
      */
-    private val state = MutableStateFlow(initialState)
+    @PublishedApi
+    internal val state = MutableStateFlow(initialState)
 
     /**
      * Read-only access to the current state value.
@@ -113,20 +114,9 @@ abstract class StateViewModel<State : Any, Intent, Event : Any>(
     /**
      * Updates the current state and optionally caches it.
      * @param state State to set
-     * @param cacheState If true, caches state in [stateCache] (default: true)
      */
-    protected fun setState(
-        state: State,
-        cacheState: Boolean = true,
-    ) {
-        viewModelScope.launch {
-            logger.i("${this@StateViewModel::class}") { "State Update :: $state" }
-            this@StateViewModel.state.update { state }
-
-            if (cacheState) {
-                cacheState(currentState)
-            }
-        }
+    protected fun setState(state: State) {
+        updateState { state }
     }
 
     /**
@@ -152,13 +142,15 @@ abstract class StateViewModel<State : Any, Intent, Event : Any>(
      * @throws IllegalStateException if current state doesn't match type [S]
      */
     protected inline fun <reified S : State> reduceState(crossinline reducer: S.() -> State) {
-        val newState =
-            (currentState as? S)?.reducer() ?: run {
-                error(
-                    "reduceState failed: Current state: ${currentState::class.simpleName} is not of expected type ${S::class.simpleName}",
-                )
-            }
-        setState(newState)
+        updateState { currentState ->
+            val castedState =
+                currentState as? S ?: run {
+                    error(
+                        "reduceState failed: Current state: ${currentState::class.simpleName} is not of expected type ${S::class.simpleName}",
+                    )
+                }
+            castedState.reducer()
+        }
     }
 
     /**
@@ -172,8 +164,9 @@ abstract class StateViewModel<State : Any, Intent, Event : Any>(
         crossinline reducer: S.() -> State,
         crossinline create: () -> S,
     ) {
-        val newState = (currentState as? S)?.reducer() ?: create()
-        setState(newState)
+        updateState { currentState ->
+            (currentState as? S)?.reducer() ?: create()
+        }
     }
 
     /**
@@ -199,7 +192,9 @@ abstract class StateViewModel<State : Any, Intent, Event : Any>(
             stateCache[S::class] as? S ?: run {
                 error("Cant resolve state, no state for type ${S::class.simpleName} cached")
             }
-        setState(stateFactory(cachedState))
+        updateState {
+            stateFactory(cachedState)
+        }
     }
 
     /**
@@ -227,5 +222,21 @@ abstract class StateViewModel<State : Any, Intent, Event : Any>(
      */
     private fun cacheState(state: State) {
         stateCache[state::class] = state
+    }
+
+    /**
+     * Updates the current state atomically and optionally caches it.
+     * @param transform Transformation function that produces a new state.
+     */
+    @PublishedApi
+    internal inline fun updateState(transform: (State) -> State) {
+        state.update { currentState ->
+            val newState = transform(currentState)
+            if (newState != currentState) {
+                logger.i("${this@StateViewModel::class}") { "State Update :: $newState" }
+                stateCache[newState::class] = newState
+            }
+            newState
+        }
     }
 }
