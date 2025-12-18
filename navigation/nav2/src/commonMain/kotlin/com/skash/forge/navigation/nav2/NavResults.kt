@@ -1,47 +1,52 @@
 package com.skash.forge.navigation.nav2
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.lifecycle.SavedStateHandle
 import com.skash.forge.navigation.NavResultKey
 
 @Composable
-inline fun <I : Any> HandleNavResults(
+fun <I : Any> HandleNavResults(
     handle: SavedStateHandle?,
-    noinline onResult: (I) -> Unit,
+    onResult: (I) -> Unit,
     builder: @Composable NavResultHandlerScope<I>.() -> Unit,
 ) {
-    val scope = remember(handle, onResult) {
-        NavResultHandlerScope(handle, onResult)
-    }
+    val scope =
+        remember(handle, onResult) {
+            NavResultHandlerScope(handle, onResult)
+        }
     scope.builder()
 }
 
 class NavResultHandlerScope<I : Any>(
-    @PublishedApi
     internal val handle: SavedStateHandle?,
-    @PublishedApi
     internal val onIntent: (I) -> Unit,
+)
+
+@Composable
+fun <T : Any, I : Any> NavResultHandlerScope<I>.OnResult(
+    navResult: NavResultKey<T>,
+    mapper: (value: T) -> I,
 ) {
-    @Composable
-    inline fun <reified T : Any> OnResult(
-        navResult: NavResultKey<T>,
-        crossinline mapper: (value: T) -> I,
-    ) {
-        HandleNavResultAsIntent(
-            handle = handle,
-            navResult = navResult,
-            mapper = mapper,
-            onIntent = onIntent,
-        )
-    }
+    HandleNavResultAsIntent(
+        handle = handle,
+        navResult = navResult,
+        mapper = mapper,
+        onIntent = onIntent,
+    )
 }
 
 @Composable
-inline fun <reified T : Any, I : Any> HandleNavResultAsIntent(
+fun <T : Any, I : Any> HandleNavResultAsIntent(
     handle: SavedStateHandle?,
     navResult: NavResultKey<T>,
-    crossinline mapper: (value: T) -> I,
-    crossinline onIntent: (I) -> Unit,
+    mapper: (value: T) -> I,
+    onIntent: (I) -> Unit,
 ) {
     val navResultEvent by handle.rememberNavResultAsEvent(navResult)
 
@@ -54,7 +59,7 @@ inline fun <reified T : Any, I : Any> HandleNavResultAsIntent(
 }
 
 @Composable
-inline fun <reified T : Any> SavedStateHandle?.rememberNavResultAsEvent(navResult: NavResultKey<T>): State<T?> {
+fun <T : Any> SavedStateHandle?.rememberNavResultAsEvent(navResult: NavResultKey<T>): State<T?> {
     if (this == null) {
         return remember { mutableStateOf(null) }
     }
