@@ -1,10 +1,14 @@
 package com.skash.forge.network.ktor
 
+import com.skash.forge.logger.i
 import com.skash.forge.network.client.HttpClient
 import com.skash.forge.network.client.HttpClientBundle
 import com.skash.forge.network.client.ApiRequestBuilder
 import com.skash.forge.network.client.StateClearable
+import com.skash.forge.network.logging.HttpLogLevel
 import com.skash.forge.network.request.ApiRequest
+import com.skash.forge.network.request.formdata.MultipartPart
+import com.skash.forge.network.request.formdata.MultipartPayload
 import com.skash.forge.network.response.ApiResponse
 import com.skash.forge.network.response.RawResponse
 import com.skash.forge.network.session.TokenAuthenticator
@@ -18,15 +22,21 @@ import io.ktor.client.plugins.auth.providers.BearerAuthProvider
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.accept
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HeadersBuilder
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.http.headers
@@ -56,9 +66,7 @@ class KtorApiClient internal constructor(
             ApiResponse.Success(mapper(body), response.status.value)
         }
 
-    override suspend fun executeRaw(
-        requestBuilder: ApiRequestBuilder.() -> Unit,
-    ): ApiResponse<RawResponse> =
+    override suspend fun executeRaw(requestBuilder: ApiRequestBuilder.() -> Unit): ApiResponse<RawResponse> =
         executeRequest(requestBuilder) { response ->
             val rawResponse =
                 RawResponse(
@@ -109,17 +117,35 @@ class KtorApiClient internal constructor(
 
         headers {
             defaultHeaders(this)
-            request.headers.forEach { (key, value) -> append(key, value) }
+        }
+
+        request.headers.forEach { (key, value) ->
+            this.headers[key] = value
         }
 
         when (request) {
-            is ApiRequest.Get -> method = HttpMethod.Get
-            is ApiRequest.Delete -> method = HttpMethod.Delete
+            is ApiRequest.Get -> {
+                method = HttpMethod.Get
+            }
+
+            is ApiRequest.Delete -> {
+                method = HttpMethod.Delete
+            }
+
             is ApiRequest.BodyRequest -> {
-                contentType(ContentType.Application.Json)
-                accept(ContentType.Application.Json)
-                val typeInfo = TypeInfo(request.bodyClass, request.bodyType)
-                setBody(request.body, typeInfo)
+                when (request.body is MultipartPayload) {
+                    true -> {
+                        val payload = request.body as MultipartPayload
+                        setBody(createMultipartFormDataContent(payload.parts))
+                    }
+
+                    false -> {
+                        contentType(ContentType.Application.Json)
+                        accept(ContentType.Application.Json)
+                        val typeInfo = TypeInfo(request.bodyClass, request.bodyType)
+                        setBody(request.body, typeInfo)
+                    }
+                }
 
                 method =
                     when (request) {
@@ -131,6 +157,34 @@ class KtorApiClient internal constructor(
         }
     }
 
+    private fun createMultipartFormDataContent(parts: List<MultipartPart>): MultiPartFormDataContent =
+        MultiPartFormDataContent(
+            formData {
+                parts.forEach { part ->
+                    when (part) {
+                        is MultipartPart.FormPart -> {
+                            append(part.name, part.value)
+                        }
+
+                        is MultipartPart.FilePart -> {
+                            append(
+                                key = part.name,
+                                value = part.content,
+                                headers =
+                                    Headers.build {
+                                        append(HttpHeaders.ContentType, part.mimeType)
+                                        append(
+                                            HttpHeaders.ContentDisposition,
+                                            "filename=\"${part.filename}\""
+                                        )
+                                    },
+                            )
+                        }
+                    }
+                }
+            },
+        )
+
     companion object {
         operator fun invoke(block: KtorApiClientConfig.() -> Unit = {}): HttpClientBundle {
             val config = KtorApiClientConfig().apply(block)
@@ -140,7 +194,13 @@ class KtorApiClient internal constructor(
                     json(config.json)
                 }
                 install(Logging) {
-
+                    level = config.logLevel.toKtorLogLevel()
+                    logger =
+                        object : Logger {
+                            override fun log(message: String) {
+                                config.logger.i("Ktor") { message }
+                            }
+                        }
                 }
             }
 
@@ -199,3 +259,12 @@ internal class KtorClientStateClearer(
         tokenAuthenticator?.clearToken()
     }
 }
+
+fun HttpLogLevel.toKtorLogLevel() =
+    when (this) {
+        HttpLogLevel.All -> LogLevel.ALL
+        HttpLogLevel.Headers -> LogLevel.HEADERS
+        HttpLogLevel.Body -> LogLevel.BODY
+        HttpLogLevel.Info -> LogLevel.INFO
+        HttpLogLevel.None -> LogLevel.NONE
+    }

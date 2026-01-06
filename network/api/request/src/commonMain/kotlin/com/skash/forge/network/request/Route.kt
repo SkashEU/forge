@@ -22,7 +22,9 @@ open class Route(
     }
 
     override val path: String by lazy {
-        val base = root.rootBasePath.orEmpty()
-        base + relativePath.takeUnless { it.isEmpty() }?.let { "/$it" }.orEmpty()
+        val base = root.rootBasePath.orEmpty().trimEnd('/')
+        val relative = relativePath.trimStart('/')
+
+        return@lazy if (base.isEmpty()) relative else "$base/$relative"
     }
 }

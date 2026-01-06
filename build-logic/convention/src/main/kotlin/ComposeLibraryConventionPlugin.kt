@@ -9,7 +9,7 @@ class ComposeLibraryConventionPlugin : Plugin<Project> {
         with(target) {
             applyPluginsByName(
                 "forge-internal-compose-module-library",
-                "maven-publish"
+                "mavenPublish"
             )
         }
     }

@@ -1,5 +1,7 @@
 package com.skash.forge.network.ktor
 
+import com.skash.forge.logger.DefaultLogger
+import com.skash.forge.logger.Logger
 import com.skash.forge.network.session.TokenAuthenticator
 import io.ktor.http.HeadersBuilder
 import kotlinx.serialization.json.Json
@@ -14,6 +16,8 @@ class KtorApiClientConfig {
             coerceInputValues = true
         }
     internal var defaultHeaders: HeadersBuilder.() -> Unit = {}
+    internal var logger: Logger = DefaultLogger
+    internal var logLevel : HttpLogLevel = HttpLogLevel.Body
 
     /**
      * Sets the [TokenAuthenticator] to be used for automatic token loading and refreshing.
@@ -34,5 +38,13 @@ class KtorApiClientConfig {
      */
     fun defaultHeaders(block: HeadersBuilder.() -> Unit) {
         this.defaultHeaders = block
+    }
+
+    /**
+     * Sets the logger that Ktor uses for logging.
+     */
+    fun logger(logger: Logger = DefaultLogger, level: HttpLogLevel = HttpLogLevel.Body) {
+        this.logger = logger
+        this.logLevel = level
     }
 }

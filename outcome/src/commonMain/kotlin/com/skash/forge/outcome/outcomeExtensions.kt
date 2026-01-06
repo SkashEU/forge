@@ -1,10 +1,14 @@
 package com.skash.forge.outcome
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 suspend fun <S : Any, E> Flow<Outcome<S, E>>.collectOutcome(
@@ -37,6 +41,37 @@ fun <S : Any, E> Flow<Outcome<S, E>>.onEachOutcome(
             emit(outcome)
         }
     }
+
+@OptIn(ExperimentalCoroutinesApi::class)
+inline fun <I : Any, E, O : Any> Flow<Outcome<I, E>>.flatMapLatestSuccess(
+    crossinline transform: suspend (value: I) -> Flow<Outcome<O, E>>,
+): Flow<Outcome<O, E>> =
+    this.flatMapLatest { outcome ->
+        when (outcome) {
+            is Outcome.Progress -> flowOf(Outcome.progress(outcome.message))
+            is Outcome.Failure -> flowOf(Outcome.failure(outcome.error))
+            is Outcome.Success -> transform(outcome.data)
+        }
+    }
+
+inline fun <I : Any, E, O : Any> Flow<Outcome<I, E>>.mapSuccess(crossinline transform: suspend (value: I) -> O): Flow<Outcome<O, E>> =
+    this.map { outcome ->
+        when (outcome) {
+            is Outcome.Progress -> {
+                Outcome.progress(message = outcome.message)
+            }
+
+            is Outcome.Failure -> {
+                Outcome.failure(outcome.error)
+            }
+
+            is Outcome.Success -> {
+                val transformedData = transform(outcome.data)
+                Outcome.success(transformedData)
+            }
+        }
+    }
+
 
 /**
  * Collects the Outcome from the flow and maps the outcome to its related function

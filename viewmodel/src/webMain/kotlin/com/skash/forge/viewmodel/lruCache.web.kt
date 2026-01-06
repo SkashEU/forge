@@ -1,12 +1,10 @@
 package com.skash.forge.viewmodel
 
-import kotlinx.coroutines.Dispatchers
+internal actual fun <K, V> lruCache(maxSize: Int): MutableMap<K, V> = JsLruCache(maxSize)
 
-internal actual fun <K, V> lruCache(maxSize: Int): MutableMap<K, V> {
-    return KmpLruCache(maxSize)
-}
-
-private class KmpLruCache<K, V>(private val maxSize: Int) : MutableMap<K, V> {
+private class JsLruCache<K, V>(
+    private val maxSize: Int,
+) : MutableMap<K, V> {
     private val internalMap = LinkedHashMap<K, V>()
 
     override fun get(key: K): V? {
@@ -17,7 +15,10 @@ private class KmpLruCache<K, V>(private val maxSize: Int) : MutableMap<K, V> {
         return value
     }
 
-    override fun put(key: K, value: V): V? {
+    override fun put(
+        key: K,
+        value: V,
+    ): V? {
         val previousValue = internalMap.remove(key)
         internalMap[key] = value
 
@@ -33,10 +34,22 @@ private class KmpLruCache<K, V>(private val maxSize: Int) : MutableMap<K, V> {
     override val entries: MutableSet<MutableMap.MutableEntry<K, V>> get() = internalMap.entries
     override val keys: MutableSet<K> get() = internalMap.keys
     override val values: MutableCollection<V> get() = internalMap.values
+
     override fun containsKey(key: K): Boolean = internalMap.containsKey(key)
+
     override fun containsValue(value: V): Boolean = internalMap.containsValue(value)
+
     override fun isEmpty(): Boolean = internalMap.isEmpty()
+
     override fun clear() = internalMap.clear()
+
     override fun remove(key: K): V? = internalMap.remove(key)
+
     override fun putAll(from: Map<out K, V>) = from.forEach { (k, v) -> put(k, v) }
+}
+
+internal actual class Lock {
+    actual fun lock() { }
+
+    actual fun unlock() { }
 }
