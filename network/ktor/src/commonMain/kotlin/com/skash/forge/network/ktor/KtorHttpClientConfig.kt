@@ -2,6 +2,7 @@ package com.skash.forge.network.ktor
 
 import com.skash.forge.logger.DefaultLogger
 import com.skash.forge.logger.Logger
+import com.skash.forge.network.logging.HttpLogLevel
 import com.skash.forge.network.session.TokenAuthenticator
 import io.ktor.http.HeadersBuilder
 import kotlinx.serialization.json.Json
