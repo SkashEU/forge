@@ -14,6 +14,7 @@ import com.skash.forge.navigation.NavigationDispatcher
 import com.skash.forge.navigation.nav2.CollectNavigationEvents
 import com.skash.forge.navigation.nav2.DefaultNavHost
 import com.skash.forge.navigation.nav2.HandleNavResults
+import com.skash.forge.navigation.nav2.OnResult
 import com.skash.forge.navigation.nav2.composableWithTransition
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
